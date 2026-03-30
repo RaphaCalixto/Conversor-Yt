@@ -1,89 +1,77 @@
-# Conversor de Video (React + Material 3 Inspired)
+# Conversor de Video Local (PWA)
 
-Interface React + API Node para colar URL do YouTube, escolher `MP4` ou `MP3`, selecionar qualidade e iniciar conversao real.
+App local para converter links do YouTube em `MP3` ou `MP4`.
+Agora o projeto esta configurado para rodar **somente localmente** (sem Render/Vercel), com backend e frontend no mesmo servidor.
 
-## Rodar local
+## O que voce precisa no PC
+
+- Node.js 20+ (recomendado LTS)
+- npm (ja vem com Node)
+- Internet para baixar dependencias e acessar o video do YouTube
+- Chrome ou Edge (para instalar como PWA)
+
+## Como rodar localmente
 
 ```bash
 npm install
-npm run dev
+npm start
 ```
 
-`npm run dev` sobe:
-- Frontend Vite em `http://localhost:5173`
-- API em `http://localhost:8787`
+O comando `npm start`:
 
-## Build de producao
+1. gera o build do frontend
+2. sobe a API local
+3. serve o app em `http://localhost:8787`
 
-```bash
-npm run build
-```
+Abra no navegador:
 
-Para deploy do frontend separado da API, configure `VITE_API_BASE_URL` (sem `/api`) antes do build.
-Exemplo:
+`http://localhost:8787`
 
-```bash
-VITE_API_BASE_URL=https://seu-backend.com npm run build
-```
+Nao precisa usar `npm run dev` para uso normal.
 
-## API esperada
+## Instalar como app (PWA)
 
-A API real ja esta implementada em `server/index.js`.
+1. Abra `http://localhost:8787` no Chrome/Edge
+2. Clique no icone de instalar app (barra de enderecos) ou menu `Instalar`
+3. O app sera instalado no PC com atalho proprio
 
-`GET /api/convert/options?url=<youtube_url>`
+Observacao: o backend continua local. O app instalado funciona enquanto o servidor local estiver rodando.
 
-```json
-{
-  "source": "server",
-  "title": "Titulo do video",
-  "thumbnail": "https://...",
-  "formats": {
-    "mp4": [
-      { "id": "mp4-1080", "label": "1080p", "ext": "mp4", "fps": 60, "sizeEstimate": "420 MB" }
-    ],
-    "mp3": [
-      { "id": "mp3-320", "label": "320 kbps", "ext": "mp3", "sizeEstimate": "16 MB" }
-    ]
-  }
-}
-```
+## Onde ficam os arquivos convertidos
 
-`POST /api/convert`
+Os arquivos convertidos ficam em:
 
-```json
-{
-  "videoUrl": "https://www.youtube.com/watch?v=...",
-  "formatId": "mp4-1080"
-}
-```
+`server/downloads`
 
-Resposta:
+Tambem podem ser baixados pelo link mostrado na interface.
 
-```json
-{
-  "status": "ok",
-  "downloadUrl": "/api/downloads/arquivo.mp3",
-  "message": "Conversao concluida."
-}
-```
+## Scripts uteis
 
-## Requisitos de conversao
+- `npm start`: build + servidor local (fluxo principal)
+- `npm run serve`: sobe somente o servidor local (usa build ja existente)
+- `npm run dev`: modo desenvolvimento (frontend + api separados)
 
-O projeto ja inclui `ffmpeg-static` e `ffprobe-static`, entao nao precisa instalar `ffmpeg` manualmente.
+## Solucao para bloqueio anti-bot do YouTube (opcional)
 
-## Render e bloqueio do YouTube (anti-bot)
+Se aparecer erro parecido com "Sign in to confirm you’re not a bot", voce pode passar cookies do YouTube:
 
-Em provedores cloud, o YouTube pode exigir autenticacao e retornar erro de bot.
-Nesse caso, configure no backend (Render) a env `YTDLP_COOKIES_B64` com o conteudo de um `cookies.txt` (formato Netscape) em Base64.
-
-Exemplo para gerar Base64 localmente:
-
-```bash
-base64 -w 0 cookies.txt
-```
-
-No Windows PowerShell:
+1. Exporte um `cookies.txt` (formato Netscape)
+2. Gere Base64 no PowerShell:
 
 ```powershell
 [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content .\cookies.txt -Raw)))
 ```
+
+3. Defina a variavel antes de iniciar:
+
+```powershell
+$env:YTDLP_COOKIES_B64="COLE_AQUI_O_BASE64"
+npm start
+```
+
+## Endpoints locais
+
+- `GET /api/health`
+- `GET /api/convert/options?url=<youtube_url>`
+- `POST /api/convert`
+- `GET /api/downloads/<arquivo>`

@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import ffmpegPath from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +15,8 @@ const port = Number(process.env.PORT || 8787);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const downloadsDir = path.join(__dirname, "downloads");
+const distDir = path.join(__dirname, "..", "dist");
+const distIndexPath = path.join(distDir, "index.html");
 const ffprobePath = ffprobeStatic?.path || "";
 const binaryDirs = [ffmpegPath, ffprobePath]
   .filter(Boolean)
@@ -347,6 +350,22 @@ app.post("/api/convert", async (req, res) => {
       details: String(error?.stderr || error?.message || error)
     });
   }
+});
+
+app.use(express.static(distDir, { index: false }));
+
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    return next();
+  }
+
+  if (!existsSync(distIndexPath)) {
+    return res
+      .status(503)
+      .send("Frontend nao encontrado. Rode 'npm run build' e reinicie o servidor.");
+  }
+
+  return res.sendFile(distIndexPath);
 });
 
 async function start() {

@@ -2,8 +2,7 @@ export function isYoutubeUrl(url) {
   return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/i.test(url.trim());
 }
 
-const apiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
-const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : "/api";
+const apiPrefix = "/api";
 
 function toApiUrl(path, params) {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
@@ -25,7 +24,7 @@ function getRequestErrorMessage(response, payload, fallbackText) {
     /^<!doctype|^<html|^the page /i.test(text);
 
   if (looksLikeHtml) {
-    return "A API de conversao nao respondeu em JSON. Verifique se o backend esta ativo e se /api aponta para ele.";
+    return "A API local nao respondeu em JSON. Verifique se o backend esta ativo no mesmo PC.";
   }
 
   if (text) return text.slice(0, 180);
@@ -50,7 +49,7 @@ async function parseApiResponse(response) {
 
   if (!payload || typeof payload !== "object") {
     throw new Error(
-      "Resposta inesperada do servidor. Verifique se a rota /api esta correta e retornando JSON."
+      "Resposta inesperada do servidor local. Verifique se a rota /api esta correta e retornando JSON."
     );
   }
 

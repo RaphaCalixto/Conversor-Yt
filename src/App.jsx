@@ -75,8 +75,8 @@ export default function App() {
         <div className="hero__badge">Conversor Inteligente</div>
         <h1>Converta video para MP3 ou MP4</h1>
         <p>
-          Cole o link, escolha o formato e selecione a qualidade. Interface pronta para integrar
-          com seu backend de conversao.
+          Cole o link, escolha o formato e selecione a qualidade. Conversao local no seu proprio
+          computador.
         </p>
       </section>
 
