@@ -11,6 +11,10 @@ function toApiUrl(path, params) {
 }
 
 function getRequestErrorMessage(response, payload, fallbackText) {
+  if (payload?.error && payload?.details) {
+    const details = String(payload.details).replace(/\s+/g, " ").slice(0, 240);
+    return `${payload.error} Detalhe: ${details}`;
+  }
   if (payload?.error) return payload.error;
   if (payload?.message) return payload.message;
 

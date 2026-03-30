@@ -24,6 +24,12 @@ const ytdlpExecOptions = {
     PATH: extraPath ? `${extraPath}${path.delimiter}${process.env.PATH || ""}` : process.env.PATH
   }
 };
+const ytdlpBaseOptions = {
+  noWarnings: true,
+  geoBypass: true,
+  userAgent:
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+};
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -126,14 +132,33 @@ function pickThumbnail(info) {
 }
 
 async function getVideoInfo(url) {
-  const raw = await ytdlp(url, {
-    dumpSingleJson: true,
-    skipDownload: true,
-    noWarnings: true,
-    preferFreeFormats: false
-  }, ytdlpExecOptions);
+  const attempts = [
+    "youtube:player_client=android,web",
+    "youtube:player_client=tv,web"
+  ];
+  let lastError = null;
 
-  return typeof raw === "string" ? JSON.parse(raw) : raw;
+  for (const extractorArgs of attempts) {
+    try {
+      const raw = await ytdlp(
+        url,
+        {
+          ...ytdlpBaseOptions,
+          dumpSingleJson: true,
+          skipDownload: true,
+          preferFreeFormats: false,
+          extractorArgs
+        },
+        ytdlpExecOptions
+      );
+
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
 }
 
 async function findDownloadedFile(baseName) {
@@ -192,21 +217,31 @@ app.post("/api/convert", async (req, res) => {
     const outputTemplate = path.join(downloadsDir, `${baseName}.%(ext)s`);
 
     if (kind === "mp4") {
-      await ytdlp(videoUrl, {
-        format: `${value}+bestaudio/best`,
-        mergeOutputFormat: "mp4",
-        output: outputTemplate,
-        noWarnings: true
-      }, ytdlpExecOptions);
+      await ytdlp(
+        videoUrl,
+        {
+          ...ytdlpBaseOptions,
+          format: `${value}+bestaudio/best`,
+          mergeOutputFormat: "mp4",
+          output: outputTemplate,
+          extractorArgs: "youtube:player_client=android,web"
+        },
+        ytdlpExecOptions
+      );
     } else if (kind === "mp3") {
-      await ytdlp(videoUrl, {
-        format: "bestaudio/best",
-        extractAudio: true,
-        audioFormat: "mp3",
-        audioQuality: `${value}K`,
-        output: outputTemplate,
-        noWarnings: true
-      }, ytdlpExecOptions);
+      await ytdlp(
+        videoUrl,
+        {
+          ...ytdlpBaseOptions,
+          format: "bestaudio/best",
+          extractAudio: true,
+          audioFormat: "mp3",
+          audioQuality: `${value}K`,
+          output: outputTemplate,
+          extractorArgs: "youtube:player_client=android,web"
+        },
+        ytdlpExecOptions
+      );
     } else {
       return res.status(400).json({ error: "Formato nao suportado." });
     }
