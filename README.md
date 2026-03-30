@@ -70,3 +70,20 @@ Resposta:
 ## Requisitos de conversao
 
 O projeto ja inclui `ffmpeg-static` e `ffprobe-static`, entao nao precisa instalar `ffmpeg` manualmente.
+
+## Render e bloqueio do YouTube (anti-bot)
+
+Em provedores cloud, o YouTube pode exigir autenticacao e retornar erro de bot.
+Nesse caso, configure no backend (Render) a env `YTDLP_COOKIES_B64` com o conteudo de um `cookies.txt` (formato Netscape) em Base64.
+
+Exemplo para gerar Base64 localmente:
+
+```bash
+base64 -w 0 cookies.txt
+```
+
+No Windows PowerShell:
+
+```powershell
+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content .\cookies.txt -Raw)))
+```

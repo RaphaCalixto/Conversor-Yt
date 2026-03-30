@@ -34,8 +34,10 @@ const ytdlpBaseOptions = {
 const ytdlpFileName = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 const bundledYtdlpPath = path.join(__dirname, "..", "node_modules", "yt-dlp-exec", "bin", ytdlpFileName);
 const runtimeYtdlpPath = path.join(os.tmpdir(), ytdlpFileName);
+const runtimeCookiesPath = path.join(os.tmpdir(), "yt-dlp-cookies.txt");
 const ytdlpDownloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlpFileName}`;
 let ytdlpClient = ytdlp;
+let ytdlpCookiesPath = "";
 
 async function fileExists(filePath) {
   try {
@@ -85,6 +87,36 @@ async function ensureYtdlp() {
   const downloadedPath = await downloadYtdlp(runtimeYtdlpPath);
   ytdlpClient = ytdlp.create(downloadedPath);
   return downloadedPath;
+}
+
+async function ensureYtdlpCookies() {
+  const cookiesB64 = String(process.env.YTDLP_COOKIES_B64 || "").trim();
+  const cookiesRaw = String(process.env.YTDLP_COOKIES || "").trim();
+  if (!cookiesB64 && !cookiesRaw) {
+    ytdlpCookiesPath = "";
+    return "";
+  }
+
+  const content = cookiesB64
+    ? Buffer.from(cookiesB64, "base64").toString("utf8")
+    : cookiesRaw.replace(/\\n/g, "\n");
+  const normalized = content.endsWith("\n") ? content : `${content}\n`;
+
+  await fs.writeFile(runtimeCookiesPath, normalized);
+  if (process.platform !== "win32") {
+    await fs.chmod(runtimeCookiesPath, 0o600);
+  }
+
+  ytdlpCookiesPath = runtimeCookiesPath;
+  return runtimeCookiesPath;
+}
+
+function buildYtdlpFlags(extraFlags = {}) {
+  return {
+    ...ytdlpBaseOptions,
+    ...(ytdlpCookiesPath ? { cookies: ytdlpCookiesPath } : {}),
+    ...extraFlags
+  };
 }
 
 app.use(cors());
@@ -198,13 +230,12 @@ async function getVideoInfo(url) {
     try {
       const raw = await ytdlpClient(
         url,
-        {
-          ...ytdlpBaseOptions,
+        buildYtdlpFlags({
           dumpSingleJson: true,
           skipDownload: true,
           preferFreeFormats: false,
           extractorArgs
-        },
+        }),
         ytdlpExecOptions
       );
 
@@ -275,27 +306,25 @@ app.post("/api/convert", async (req, res) => {
     if (kind === "mp4") {
       await ytdlpClient(
         videoUrl,
-        {
-          ...ytdlpBaseOptions,
+        buildYtdlpFlags({
           format: `${value}+bestaudio/best`,
           mergeOutputFormat: "mp4",
           output: outputTemplate,
           extractorArgs: "youtube:player_client=android,web"
-        },
+        }),
         ytdlpExecOptions
       );
     } else if (kind === "mp3") {
       await ytdlpClient(
         videoUrl,
-        {
-          ...ytdlpBaseOptions,
+        buildYtdlpFlags({
           format: "bestaudio/best",
           extractAudio: true,
           audioFormat: "mp3",
           audioQuality: `${value}K`,
           output: outputTemplate,
           extractorArgs: "youtube:player_client=android,web"
-        },
+        }),
         ytdlpExecOptions
       );
     } else {
@@ -323,7 +352,13 @@ app.post("/api/convert", async (req, res) => {
 async function start() {
   await fs.mkdir(downloadsDir, { recursive: true });
   const ytdlpPathInUse = await ensureYtdlp();
+  const cookiesPathInUse = await ensureYtdlpCookies();
   console.log(`yt-dlp ativo em: ${ytdlpPathInUse}`);
+  if (cookiesPathInUse) {
+    console.log(`cookies do yt-dlp ativos em: ${cookiesPathInUse}`);
+  } else {
+    console.log("cookies do yt-dlp: nao configurado");
+  }
   app.listen(port, () => {
     console.log(`API ativa em http://localhost:${port}`);
   });
