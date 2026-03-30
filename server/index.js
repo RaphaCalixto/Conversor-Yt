@@ -3,6 +3,7 @@ import express from "express";
 import ffmpegPath from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ytdlp from "yt-dlp-exec";
@@ -30,6 +31,61 @@ const ytdlpBaseOptions = {
   userAgent:
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 };
+const ytdlpFileName = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
+const bundledYtdlpPath = path.join(__dirname, "..", "node_modules", "yt-dlp-exec", "bin", ytdlpFileName);
+const runtimeYtdlpPath = path.join(os.tmpdir(), ytdlpFileName);
+const ytdlpDownloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlpFileName}`;
+let ytdlpClient = ytdlp;
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function downloadYtdlp(targetPath) {
+  const response = await fetch(ytdlpDownloadUrl);
+  if (!response.ok) {
+    throw new Error(`Nao foi possivel baixar yt-dlp (${response.status}).`);
+  }
+
+  const binary = Buffer.from(await response.arrayBuffer());
+  await fs.writeFile(targetPath, binary);
+  if (process.platform !== "win32") {
+    await fs.chmod(targetPath, 0o755);
+  }
+
+  return targetPath;
+}
+
+async function ensureYtdlp() {
+  const manualPath = String(process.env.YTDLP_PATH || "").trim();
+
+  if (manualPath) {
+    if (!(await fileExists(manualPath))) {
+      throw new Error(`YTDLP_PATH informado mas nao encontrado: ${manualPath}`);
+    }
+    ytdlpClient = ytdlp.create(manualPath);
+    return manualPath;
+  }
+
+  if (await fileExists(bundledYtdlpPath)) {
+    ytdlpClient = ytdlp.create(bundledYtdlpPath);
+    return bundledYtdlpPath;
+  }
+
+  if (await fileExists(runtimeYtdlpPath)) {
+    ytdlpClient = ytdlp.create(runtimeYtdlpPath);
+    return runtimeYtdlpPath;
+  }
+
+  const downloadedPath = await downloadYtdlp(runtimeYtdlpPath);
+  ytdlpClient = ytdlp.create(downloadedPath);
+  return downloadedPath;
+}
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -140,7 +196,7 @@ async function getVideoInfo(url) {
 
   for (const extractorArgs of attempts) {
     try {
-      const raw = await ytdlp(
+      const raw = await ytdlpClient(
         url,
         {
           ...ytdlpBaseOptions,
@@ -217,7 +273,7 @@ app.post("/api/convert", async (req, res) => {
     const outputTemplate = path.join(downloadsDir, `${baseName}.%(ext)s`);
 
     if (kind === "mp4") {
-      await ytdlp(
+      await ytdlpClient(
         videoUrl,
         {
           ...ytdlpBaseOptions,
@@ -229,7 +285,7 @@ app.post("/api/convert", async (req, res) => {
         ytdlpExecOptions
       );
     } else if (kind === "mp3") {
-      await ytdlp(
+      await ytdlpClient(
         videoUrl,
         {
           ...ytdlpBaseOptions,
@@ -266,6 +322,8 @@ app.post("/api/convert", async (req, res) => {
 
 async function start() {
   await fs.mkdir(downloadsDir, { recursive: true });
+  const ytdlpPathInUse = await ensureYtdlp();
+  console.log(`yt-dlp ativo em: ${ytdlpPathInUse}`);
   app.listen(port, () => {
     console.log(`API ativa em http://localhost:${port}`);
   });
