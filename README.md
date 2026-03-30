@@ -19,6 +19,13 @@ npm run dev
 npm run build
 ```
 
+Para deploy do frontend separado da API, configure `VITE_API_BASE_URL` (sem `/api`) antes do build.
+Exemplo:
+
+```bash
+VITE_API_BASE_URL=https://seu-backend.com npm run build
+```
+
 ## API esperada
 
 A API real ja esta implementada em `server/index.js`.
